@@ -1,8 +1,8 @@
 Option Explicit
 
 Private Const LOG_SHEET As String = "_Log"      'ブランク時はログ出力無し
-Private Const DISP_FLG As Integer = 1           '1:ログSheet表示, 他:非表示
 Private Const DEBUG_FLG As Integer = 1          '1:Debug出力有り, 他:無し
+Private Const STR_ESCAPE As String = "〆"       '非出力文字列
 
 Public Const LVL_ERR As Integer = 0
 Public Const LVL_WARN As Integer = 1
@@ -17,6 +17,7 @@ Private logSh As Worksheet
 Private LogLevel As Variant 'エラーレベルはConstで定義し、LogInitで内容を設定
 
 '■Log初期化
+'Logシート追加時にActiveSheetがLogシートに移るので戻すこと
 Public Sub LogInit()
 
     logCount = 1
@@ -27,7 +28,7 @@ Public Sub LogInit()
 
     Application.ScreenUpdating = False
     
-    If HasSheetNamne(LOG_SHEET) Then
+    If HasSheetNamne(ActiveWorkbook, LOG_SHEET) Then
         Set logSh = ThisWorkbook.Worksheets(LOG_SHEET)
         '前回ログ削除
         logSh.Cells.Delete
@@ -35,11 +36,9 @@ Public Sub LogInit()
         Call MoveSheetCursorInit(logSh)
     Else
         'Logシート追加
-        Set logSh = Worksheets.Add()
+        Set logSh = Worksheets.Add(After:=Worksheets(Worksheets.Count))
         logSh.name = LOG_SHEET
     End If
-    
-    logSh.Visible = (HIDE_FLG = 1)
     
     LogLevel = Array("エラー:", "警告:", "情報:", "Debug:", "DB:") '★エラーレベル追加時は更新
     
@@ -55,7 +54,7 @@ End Sub
 
 '■Log書込み
 Public Sub LogWrite(lvl As Integer, str As String _
-                    , Optional val As String = "〆")
+                    , Optional val As String = STR_ESCAPE)
     
     If Len(LOG_SHEET) = 0 Then Exit Sub                 'ログ出力無し
         
@@ -64,7 +63,7 @@ Public Sub LogWrite(lvl As Integer, str As String _
     logSh.Range("A" & logCount).Value = Format(Now(), "yyyy-mm-dd hh:mm:ss")
     logSh.Range("B" & logCount).Value = LogLevel(lvl)
     logSh.Range("C" & logCount).Value = str
-    If val <> "〆" Then logSh.Range("D" & logCount).Value = "(" & val & ")"
+    If val <> STR_ESCAPE Then logSh.Range("D" & logCount).Value = "(" & val & ")"
     
     Select Case lvl '★エラーレベル追加時は更新
         Case LVL_ERR, LVL_WARN, LVL_DB
@@ -75,7 +74,7 @@ Public Sub LogWrite(lvl As Integer, str As String _
 End Sub
 
 '■Log終了
-Public Sub LogFinal(Optional str As String = "", Optional val As String = "〆")
+Public Sub LogFinal(Optional str As String = "", Optional val As String = STR_ESCAPE)
     
     If Len(LOG_SHEET) = 0 Then Exit Sub 'ログ出力無し
     
