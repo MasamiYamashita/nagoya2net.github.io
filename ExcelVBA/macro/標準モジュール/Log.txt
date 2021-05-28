@@ -1,0 +1,97 @@
+Option Explicit
+
+Private Const LOG_SHEET As String = "_Log"      'ブランク時はログ出力無し
+Private Const DISP_FLG As Integer = 1           '1:ログSheet表示, 他:非表示
+Private Const DEBUG_FLG As Integer = 1          '1:Debug出力有り, 他:無し
+
+Public Const LVL_ERR As Integer = 0
+Public Const LVL_WARN As Integer = 1
+Public Const LVL_INFO As Integer = 2
+Public Const LVL_DEBUG As Integer = 3
+Public Const LVL_DB As Integer = 4
+
+Public bookName As String   'ダイアログtitleに使用
+Private logCount As Integer
+Private errCount As Integer
+Private logSh As Worksheet
+Private LogLevel As Variant 'エラーレベルはConstで定義し、LogInitで内容を設定
+
+'■Log初期化
+Public Sub LogInit()
+
+    logCount = 1
+    errCount = 1
+    bookName = Split(ThisWorkbook.name, ".")(0)
+    
+    If Len(LOG_SHEET) = 0 Then Exit Sub  'ログ出力無し
+
+    Application.ScreenUpdating = False
+    
+    If HasSheetNamne(LOG_SHEET) Then
+        Set logSh = ThisWorkbook.Worksheets(LOG_SHEET)
+        '前回ログ削除
+        logSh.Cells.Delete
+        'カーソル位置調整
+        Call MoveSheetCursorInit(logSh)
+    Else
+        'Logシート追加
+        Set logSh = Worksheets.Add()
+        logSh.name = LOG_SHEET
+    End If
+    
+    logSh.Visible = (HIDE_FLG = 1)
+    
+    LogLevel = Array("エラー:", "警告:", "情報:", "Debug:", "DB:") '★エラーレベル追加時は更新
+    
+    '列書式設定
+    With logSh.Columns("A:A")
+        .NumberFormatLocal = "yyyy-mm-dd hh:mm:ss"
+        .HorizontalAlignment = xlLeft
+    End With
+    logSh.Columns("B:B").HorizontalAlignment = xlRight
+    
+    Application.ScreenUpdating = True
+End Sub
+
+'■Log書込み
+Public Sub LogWrite(lvl As Integer, str As String _
+                    , Optional val As String = "〆")
+    
+    If Len(LOG_SHEET) = 0 Then Exit Sub                 'ログ出力無し
+        
+    If DEBUG_FLG <> 1 And lvl = LVL_DEBUG Then Exit Sub 'Debugは出力しない
+
+    logSh.Range("A" & logCount).Value = Format(Now(), "yyyy-mm-dd hh:mm:ss")
+    logSh.Range("B" & logCount).Value = LogLevel(lvl)
+    logSh.Range("C" & logCount).Value = str
+    If val <> "〆" Then logSh.Range("D" & logCount).Value = "(" & val & ")"
+    
+    Select Case lvl '★エラーレベル追加時は更新
+        Case LVL_ERR, LVL_WARN, LVL_DB
+            errCount = errCount + 1
+    End Select
+ 
+    logCount = logCount + 1
+End Sub
+
+'■Log終了
+Public Sub LogFinal(Optional str As String = "", Optional val As String = "〆")
+    
+    If Len(LOG_SHEET) = 0 Then Exit Sub 'ログ出力無し
+    
+    If errCount > 1 Then
+        Call LogWrite(LVL_INFO, str & "　異常終了")
+        MessageBox 0, "エラーが有ります。" & vbCrLf & "Logシートを確認して下さい。" _
+                    , bookName, MB_OK Or MB_TOPMOST Or MB_ICONEXCLAMATION
+    Else
+        Call LogWrite(LVL_INFO, str & "　正常終了", val)
+        MessageBox 0, "正常終了", bookName, MB_OK Or MB_TOPMOST Or MB_ICONINFORMATION
+    End If
+
+    logSh.Columns("A:D").AutoFit
+End Sub
+
+'■エラー有無チェック
+Public Function ChkHasErr() As Boolean
+    ChkHasErr = (errCount > 1)
+End Function

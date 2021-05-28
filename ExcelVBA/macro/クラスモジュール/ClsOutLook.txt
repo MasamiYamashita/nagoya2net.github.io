@@ -1,0 +1,93 @@
+Option Explicit
+'☆「ツール」→「参照設定」Microsoft Outlook ?.0 Object Library
+
+Private Const strDebug As String = ""
+Private Const mailDebug As String = ""
+
+Public mailDisp As Boolean      'mail表示
+Public mailSave As Boolean      'mail保存
+Public Immediately As Boolean   'mail即時送信
+
+Public mailTitle As String      'メールタイトル
+Public mailContext As String    'メール本文
+Public mailFilePath As String   '添付ファイルPath
+
+Private outLookObj As Outlook.Application
+Private errCount As Integer
+
+'■ 初期化処理
+Private Sub Class_Initialize()
+    On Error GoTo Err
+    Set outLookObj = CreateObject("Outlook.Application")
+    
+    mailDisp = False    'mail表示
+    mailSave = False    'mail保存
+    Immediately = False 'mail即時送信
+    mailTitle = ""      'メールタイトル
+    mailContext = ""    'メール本文
+    mailFilePath = ""   '添付ファイルPath
+    errCount = 1
+    
+    Call LogWrite(LVL_DEBUG, "OutLookクラス　起動")
+    Debug.Print "outlookObj initalized"
+    Exit Sub
+Err:
+    Call LogWrite(LVL_ERR, "「ツール」→「参照設定」を設定して下さい。", "Microsoft Outlook ?.0 Object Library")
+End Sub
+
+'■メール送信
+'送信先             adr:メールアドレス
+'タイトル         title:
+'本文           context:
+'宛名            person: 本文1行目に表示
+'添付ファイル      path:パスを設定
+Public Function MakeSendMail(adr As String _
+                        , person As String _
+                        , ByRef mailObj As Outlook.MailItem) As Boolean
+       
+    On Error GoTo Err
+    Set mailObj = Nothing '初期値
+    Dim clsMail As Outlook.MailItem
+    
+    Set clsMail = outLookObj.CreateItem(olMailItem)
+    
+    'メール情報
+    clsMail.BodyFormat = 3       'リッチテキストに変更
+    clsMail.To = adr & mailDebug 'To宛先
+    'clsMail.CC =                'cc宛先
+    'clsMail.BCC =               'bcc宛先
+    clsMail.Subject = strDebug & mailTitle   '件名
+    
+    'メール本文
+    clsMail.Body = IIf(Len(person) > 0, person & vbCrLf & vbCrLf, "") _
+                    & strDebug & mailContext & vbCrLf
+                    
+    '添付ファイル
+    If Len(mailFilePath) > 0 Then
+        clsMail.Body = clsMail.Body & vbCrLf
+        clsMail.Attachments.Add Source:=mailFilePath
+    End If
+    
+    If Me.mailDisp Then clsMail.Display 'mail表示
+    If Me.mailSave Then clsMail.Save 'mail保存
+    'If Me.Immediately Then clsMail.Send 'mail即時送信
+
+    Set mailObj = clsMail
+    
+    MakeSendMail = True
+    
+    Exit Function
+Err:
+    Set clsMail = Nothing
+    errCount = errCount + 1
+    MakeSendMail = False
+
+End Function
+
+' ■終了時処理
+Private Sub Class_Terminate()
+    Set outLookObj = Nothing
+    If errCount = 1 Then
+        Call LogWrite(LVL_DEBUG, "OutLookクラス　正常終了")
+    End If
+End Sub
